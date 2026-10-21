@@ -1,1 +1,393 @@
-Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wikipedia閲覧ランキング</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#f4f7fb;
+  color:#182638;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;
+}
+main{max-width:720px;margin:auto;padding:24px 16px}
+h1{font-size:24px;margin:0 0 6px}
+h1 span{color:#36c}
+p{font-size:13px;line-height:1.7;color:#526174}
+.controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin:18px 0;
+}
+button,select{
+  font:inherit;
+  min-height:44px;
+  padding:8px 12px;
+  border:1px solid #b8c7dc;
+  border-radius:8px;
+  background:white;
+  color:#182638;
+}
+button{cursor:pointer}
+button:disabled{opacity:.4}
+button:focus-visible,
+select:focus-visible,
+a:focus-visible{
+  outline:3px solid #36c;
+  outline-offset:3px;
+}
+#date{font-weight:700;margin-right:auto}
+#status{min-height:44px}
+ol{list-style:none;margin:0;padding:0}
+li{
+  display:flex;
+  gap:12px;
+  padding:16px 12px;
+  background:white;
+  border-bottom:1px solid #dce4ef;
+}
+.rank{
+  font-size:22px;
+  font-weight:700;
+  min-width:36px;
+  text-align:right;
+}
+.item{flex:1;min-width:0}
+a{color:#2456a6;overflow-wrap:anywhere;text-decoration:none}
+.meta{font-size:12px;color:#526174;margin:6px 0}
+.track{height:4px;background:#e4ebf6}
+.bar{height:100%;background:#36c}
+footer{margin-top:24px;font-size:12px;line-height:1.8;color:#526174}
+</style>
+</head>
+<body>
+<main>
+<h1>いま読まれている <span>Wikipedia</span></h1>
+<p>日本語版の閲覧数ランキングです。検索回数ではありません。</p>
+
+<div class="controls">
+  <button id="prev" aria-label="前日">‹</button>
+  <strong id="date"></strong>
+  <button id="next" aria-label="翌日">›</button>
+  <select id="count" aria-label="表示件数">
+    <option value="20">上位20</option>
+    <option value="50">上位50</option>
+    <option value="100">上位100</option>
+  </select>
+  <button id="refresh">最新を確認</button>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<ol id="list"></ol>
+<noscript>ランキングの表示にはJavaScriptを有効にしてください。</noscript>
+
+<footer>
+出典：Wikimedia Pageviews API。
+日付は公式データの集計日（UTC）です。
+メインページ・特別ページなどを除外して順位を振り直しています。
+保存済みデータは2026年10月17日分です。
+通信できない場合は古いデータのまま表示します。
+</footer>
+</main>
+
+<script>
+'use strict';
+
+const savedDate='2026-10-17';
+const saved=[
+['ジェラードン',163863],
+['中村アン',80791],
+['ヤッホイ',45019],
+['キングオブコント',42004],
+['原爆下の対局',33432],
+['工藤公康',32352],
+['ダウ90000',29399],
+['宇野千代',28152],
+['相川亮二',27988],
+['蛙亭',25476],
+['アドルフ・ヒトラー',23311],
+['LOST10',23283],
+['アウシュヴィッツ＝ビルケナウ強制収容所',22321],
+['渡邉美穂_(女優)',22246],
+['簗和生',22016],
+['ケイティー・ザカリア',20770],
+['横浜流星',20370],
+['ロングコートダディ',20366],
+['工藤泰成',18889],
+['武蔵野学院大学',18846],
+['辻谷耕史',18419],
+['亀田和毅',17769],
+['EBiDAN',17744],
+['VIVANT',16916],
+['三森大貴',16822],
+['赤楚衛二',16570],
+['榮倉奈々',16293],
+['西村真二',15916],
+['俺たちの箱根駅伝',15060],
+['安斉星来',14472],
+['重岡銀次朗',14161],
+['救命病棟24時',14153],
+['相性はいいよね',13721],
+['石橋静河',13318],
+['きょん',13182],
+['クライマックスシリーズ',13142],
+['小林虎之介',12808],
+['スパイシーガーリック',12405],
+['日本選手権シリーズ',12268],
+['リンリン_(俳優)',12202],
+['M!LK',12189],
+['河合優実',12055],
+['山中柔太朗',12034],
+['渡辺久美子',12013],
+['東京箱根間往復大学駅伝競走',11957],
+['タイガー・ジェット・シン',11838],
+['横浜DeNAベイスターズ',11486],
+['津田健次郎',11429],
+['山﨑武司',11025],
+['佐藤輝明',10663],
+['工藤阿須加',10569],
+['上垣皓太朗',10568],
+['源頼家',10518],
+['ユダヤ人',10451],
+['ブラッサム',10439],
+['水沢林太郎',10321],
+['薬屋のひとりごと',10048],
+['ブランドン・フィゲロア',10012],
+['スティダー',9965],
+['杉山裕之',9862],
+['片渕茜',9819],
+['アドルフ・ヒトラーの死',9689],
+['小椋佳',9422],
+['ハナコ_(お笑いトリオ)',9387],
+['あにいもうと_(2026年のテレビドラマ)',9288],
+['篠田ゆう',9244],
+['負の世界遺産',9181],
+['蓮見翔',9077],
+['奥寺佐渡子',9038],
+['ナチス・ドイツ',8874],
+['柿澤勇人',8823],
+['超特急_(音楽グループ)',8750],
+['武部新',8728],
+['踊る大捜査線',8406],
+['淀殿',8354],
+['石川数正',8339],
+['富栄ドラム',8331],
+['森下翔太',8296],
+['我が家',8283],
+['カロリン・クレア・リーヴィット',8237],
+['A2O_LITE',8013],
+['西岡剛_(内野手)',8007],
+['明日花キララ',7868],
+['マキシミリアノ・コルベ',7779],
+['牧秀悟',7767],
+['朱色の仮面',7710],
+['矢口アサミ',7691],
+['山田杏奈',7672],
+['本田響矢',7647],
+['や団',7642],
+['末澤誠也',7612],
+['成瀬脩人',7546],
+['処女膜',7512],
+['相川七瀬',7355],
+['谷胡桃',7301],
+['度会隆輝',7230],
+['大松絵美',7201],
+['日比麻音子',7199],
+['ザ・マミィ',7156],
+['山本萩子',7126]
+];
+
+const $=id=>document.getElementById(id);
+const cache=new Map([
+  [savedDate,saved.map(([article,views])=>({article,views}))]
+]);
+
+let current=savedDate;
+let latest=savedDate;
+let serial=0;
+
+const excluded=/^(メインページ$|特別:|Special:|Wikipedia:|Portal:|ポータル:|Help:|ヘルプ:|Category:|カテゴリ:|Template:|テンプレート:|File:|ファイル:|User:|利用者:|ノート:|Talk:)/i;
+
+function offset(day,n){
+  const d=new Date(day+'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+function escapeText(s){
+  return String(s).replace(/[&<>"']/g,c=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[c]));
+}
+
+function draw(){
+  const rows=cache.get(current)||[];
+  const prev=cache.get(offset(current,-1));
+  const ranks=prev
+    ?new Map(prev.map((a,i)=>[a.article,i+1]))
+    :null;
+
+  $('date').textContent=current.replace(/-/g,'/')+'付';
+  $('next').disabled=current>=latest;
+
+  $('list').innerHTML=rows
+    .slice(0,Number($('count').value))
+    .map((a,i)=>{
+      const old=ranks&&ranks.get(a.article);
+      const diff=!ranks
+        ?'比較データなし'
+        :old===undefined
+        ?'前日取得範囲外'
+        :old===i+1
+        ?'順位変動なし'
+        :old>i+1
+        ?'↑'+(old-i-1)
+        :'↓'+(i+1-old);
+
+      return '<li><span class="rank">'+(i+1)+
+        '</span><div class="item">'+
+        '<a target="_blank" rel="noopener" href="'+
+        'https://ja.wikipedia.org/wiki/'+
+        encodeURIComponent(a.article)+'">'+
+        escapeText(a.article.replace(/_/g,' '))+
+        '</a><div class="meta">'+
+        a.views.toLocaleString('ja-JP')+
+        '回閲覧　'+diff+
+        '</div><div class="track">'+
+        '<div class="bar" style="width:'+
+        (a.views/rows[0].views*100)+
+        '%"></div></div></div></li>';
+    }).join('');
+}
+
+async function get(day){
+  if(cache.has(day))return cache.get(day);
+
+  const controller=new AbortController();
+  let timer;
+
+  try{
+    const job=(async()=>{
+      const r=await fetch(
+        'https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access/'+
+        day.replace(/-/g,'/'),
+        {signal:controller.signal}
+      );
+
+      if(!r.ok)throw new Error('HTTP '+r.status);
+
+      const j=await r.json();
+      const rows=j.items[0].articles
+        .filter(a=>!excluded.test(a.article))
+        .sort((a,b)=>b.views-a.views);
+
+      if(!rows.length)throw new Error('データなし');
+      return rows;
+    })();
+
+    const limit=new Promise((_,reject)=>{
+      timer=setTimeout(()=>{
+        controller.abort();
+        reject(new Error('時間切れ'));
+      },6000);
+    });
+
+    const rows=await Promise.race([job,limit]);
+    cache.set(day,rows);
+    return rows;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+async function show(day){
+  const id=++serial;
+
+  $('status').textContent=
+    '指定日のデータを確認しています。現在の一覧はそのまま表示します。';
+
+  try{
+    await get(day);
+    if(id!==serial)return;
+
+    current=day;
+    draw();
+
+    $('status').textContent=
+      '表示中の集計日：'+current+
+      '。前日との比較を確認しています。';
+
+    try{
+      await get(offset(day,-1));
+    }catch(e){}
+
+    if(id!==serial)return;
+    draw();
+
+    $('status').textContent=
+      '表示中の集計日：'+current+'。'+
+      (cache.has(offset(day,-1))
+        ?'前日との順位比較を表示しています。'
+        :'前日データが取得できないため、順位比較は表示できません。');
+
+  }catch(e){
+    if(id===serial){
+      $('status').textContent=
+        day+'のデータを取得できませんでした。表示中の'+
+        current+'の一覧を残しています。';
+    }
+  }
+}
+
+async function refresh(){
+  const id=++serial;
+
+  $('status').textContent=
+    '最新データを確認しています。現在の一覧はそのまま表示します。';
+
+  const today=new Date().toISOString().slice(0,10);
+
+  for(let n=1;n<=7;n++){
+    const day=offset(today,-n);
+
+    try{
+      await get(day);
+      if(id!==serial)return;
+
+      latest=day;
+      await show(day);
+      return;
+
+    }catch(e){
+      if(id!==serial)return;
+    }
+  }
+
+  if(id===serial){
+    $('status').textContent=
+      '直近7日分を取得できませんでした。表示中の'+
+      current+'のデータは最新とは限りません。';
+  }
+}
+
+$('prev').onclick=()=>show(offset(current,-1));
+$('next').onclick=()=>show(offset(current,1));
+$('count').onchange=draw;
+$('refresh').onclick=refresh;
+
+draw();
+$('status').textContent=
+  '保存済みデータ（'+savedDate+'）を表示しています。';
+refresh();
+</script>
+</body>
+</html>
